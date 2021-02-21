@@ -1,4 +1,4 @@
-const validator = require('validator');
+const LoginServices = require('./services/login.service');
 const signupServices = require('./services/signup.service');
 
 class Controllers {
@@ -8,16 +8,12 @@ class Controllers {
          const dto = req.body;
 
          //* @VALIDATION */
-         const validEmail = validator.isEmail(dto.email);
-         if (!validEmail) {
-            STATUS = 400;
-            throw new Error('invalid email');
-         }
+
          //*  @SERVICES
-         const userExists = await signupServices.checkIfEmailExists(dto.email);
+         const userExists = await signupServices.checkIfUsernameExists(dto.username);
          if (userExists) {
             STATUS = 400;
-            throw new Error('email already registered');
+            throw new Error('username already registered');
          }
 
          await signupServices.createUser(dto);
@@ -28,10 +24,25 @@ class Controllers {
       }
    }
    static async login(req, res) {
+      let STATUS;
       try {
-         //  const dto = req.body;
+         const dto = req.body;
+         //* @SERVICES SECTION
+         const user = await LoginServices.findUser(dto);
+         if (!user) {
+            STATUS = 404;
+            throw new Error('user not found');
+         }
+         const passwordVerified = await LoginServices.verifyPassword(dto.password, user.password);
+         if (!passwordVerified) {
+            STATUS = 400;
+            throw new Error('password does not match');
+         }
+
+         const token = LoginServices.generateToken({ user_id: user._id });
+         return res.status(200).json({ success: true, message: 'login success', token });
       } catch (err) {
-         return res.status(400).json({ success: false, message: err.message });
+         return res.status(STATUS || 500).json({ success: false, message: err.message });
       }
    }
 }
